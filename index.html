@@ -194,6 +194,13 @@ input:focus{outline:none;border-color:var(--accent);background:#fff;}
       <span id="notfound-code" style="font-size:12px;color:var(--muted);font-family:monospace;"></span>
     </div>
     <div class="card">
+      <div class="card-title">🔍 Ürün Adıyla Ara</div>
+      <div class="mbar">
+        <input type="text" id="name-search-input" placeholder="Ürün adı girin..." oninput="searchByName()">
+      </div>
+      <div id="name-search-results" style="margin-top:10px;"></div>
+    </div>
+    <div class="card">
       <div class="card-title">➕ Listeye Ekle</div>
       <div class="fg"><label>Ürün Adı</label><input type="text" id="new-product-name" placeholder="Ürün adını girin..."></div>
       <div class="fg"><label>Son Kullanma Tarihi (İsteğe Bağlı)</label><input type="date" id="new-product-skt"></div>
@@ -809,6 +816,53 @@ async function saveNewProduct(barkod, ad, skt){
       document.getElementById('found-section').classList.remove('hidden');
     }
   }
+}
+
+// ===== NAME SEARCH =====
+function searchByName(){
+  const q = document.getElementById('name-search-input').value.toLowerCase().trim();
+  const container = document.getElementById('name-search-results');
+  if(!q){ container.innerHTML=''; return; }
+
+  const all = [...DB.products, ...(DB.removed||[])];
+  const results = all.filter(p => p.a.toLowerCase().includes(q)).slice(0, 8);
+
+  if(!results.length){
+    container.innerHTML = `<div style="font-size:13px;color:var(--muted);padding:8px 0;">Sonuç bulunamadı</div>`;
+    return;
+  }
+
+  container.innerHTML = results.map(p => {
+    const skts = getSKTs(p.b);
+    const badge = skts.length ? sbadge(Math.min(...skts.map(e=>dl(e.t)))) : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--bg);">
+      <div>
+        <div style="font-weight:700;font-size:14px;">${p.a}</div>
+        <div style="font-size:11px;color:var(--muted);font-family:monospace;">${p.b}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        ${badge}
+        <button class="btn btn-primary btn-sm" onclick="selectFromNameSearch('${p.b}')">Seç</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectFromNameSearch(barkod){
+  const p = findP(barkod);
+  if(!p) return;
+  // Clear name search
+  document.getElementById('name-search-input').value='';
+  document.getElementById('name-search-results').innerHTML='';
+  document.getElementById('notfound-section').classList.add('hidden');
+  // Show found section with this product
+  curProduct = p;
+  document.getElementById('found-name').textContent = p.a;
+  document.getElementById('found-code').textContent = 'Barkod: ' + p.b;
+  const d = new Date(); d.setDate(d.getDate()+30);
+  document.getElementById('skt-date').value = d.toISOString().split('T')[0];
+  document.getElementById('skt-not').value = '';
+  document.getElementById('found-section').classList.remove('hidden');
 }
 
 // ===== CROSS BARCODE =====

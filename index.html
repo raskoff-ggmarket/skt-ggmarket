@@ -269,6 +269,24 @@ input:focus{outline:none;border-color:var(--accent);background:#fff;}
   </div>
 </div>
 
+<!-- CROSS BARCODE MODAL -->
+<div class="overlay" id="cross-ov" onclick="if(event.target===this)closeCrossBarcode()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🔗 Çapraz Barkod Ekle</div>
+    <div style="background:var(--green-bg);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:700;color:var(--green);" id="cross-product-name"></div>
+      <div style="font-size:11px;color:var(--muted);font-family:monospace;" id="cross-product-code"></div>
+    </div>
+    <div class="fg"><label>Yeni Barkod</label><input type="text" id="cross-barkod-input" placeholder="Çapraz barkod..." inputmode="numeric"></div>
+    <div id="cross-existing" style="margin-bottom:8px;"></div>
+    <div class="modal-row">
+      <button class="btn btn-secondary" onclick="closeCrossBarcode()">Kapat</button>
+      <button class="btn btn-primary" onclick="submitCrossBarcode()">➕ Ekle</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD PRODUCT MODAL -->
 <div class="overlay" id="addprod-ov" onclick="if(event.target===this)closeAddProduct()">
   <div class="modal">
@@ -398,6 +416,7 @@ async function init(){
   lsLoad();
   document.getElementById('load-txt').textContent = 'Google Sheets\'ten yükleniyor...';
   await gsLoad();
+  await fetchCrossBarcodes();
   document.getElementById('loading').style.display='none';
   refreshHeader(); refreshListStatus();
   checkNotifStatus(); renderList(); renderInventory();
@@ -500,6 +519,15 @@ function handleBarcode(code){
   document.getElementById('manual-input').value=code;
   let p=DB.products.find(x=>String(x.b)===String(code));
   if(!p)p=DB.removed.find(x=>String(x.b)===String(code));
+  if(!p && DB.crossMap){
+    // Check if this code is a cross barcode for any product
+    for(const [mainB, crossList] of Object.entries(DB.crossMap)){
+      if(crossList.includes(code)){
+        p = DB.products.find(x=>x.b===mainB) || DB.removed.find(x=>x.b===mainB);
+        if(p) break;
+      }
+    }
+  }
   if(p){
     curProduct=p;
     document.getElementById('found-name').textContent=p.a;
@@ -645,7 +673,17 @@ function renderInventory(){
     html+=`<div class="sec-title" style="color:${color};">${label} (${arr.length})</div>`;
     arr.forEach(p=>{
       const bs=getSKTs(p.b).map(e=>`<div style="display:flex;gap:4px;align-items:center;font-size:12px;"><span style="color:var(--muted);">${fmtD(e.t)}</span>${sbadge(dl(e.t))}</div>`).join('');
-      html+=`<div class="inv-row"><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;">${p.a}</div><div style="font-size:11px;color:var(--muted);font-family:monospace;">${p.b}</div></div><div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end;flex-shrink:0;">${bs||'<span style="font-size:12px;color:var(--muted);">SKT yok</span>'}</div></div>`;
+      const crossList = (DB.crossMap||{})[p.b]||[];
+      const crossTags = crossList.length ? `<div style="font-size:10px;color:var(--muted);margin-top:3px;">🔗 ${crossList.join(', ')}</div>` : '';
+      html+=`<div class="inv-row">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:14px;">${p.a}</div>
+          <div style="font-size:11px;color:var(--muted);font-family:monospace;">${p.b}</div>
+          ${crossTags}
+        </div>
+        <button class="ibtn" style="background:var(--bg);border-radius:8px;padding:6px 8px;font-size:13px;flex-shrink:0;" onclick="openCrossBarcode('${p.b}','${p.a.replace(/'/g,"\\'")}')">🔗+</button>
+        <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end;flex-shrink:0;">${bs||'<span style="font-size:12px;color:var(--muted);">SKT yok</span>'}</div>
+      </div>`;
     });
   };
   mg('🔴 Kritik (0-3 Gün)',groups.c,'var(--red)');
@@ -771,6 +809,56 @@ async function saveNewProduct(barkod, ad, skt){
       document.getElementById('found-section').classList.remove('hidden');
     }
   }
+}
+
+// ===== CROSS BARCODE =====
+let crossTarget = null;
+
+function openCrossBarcode(barkod, ad){
+  crossTarget = barkod;
+  document.getElementById('cross-product-name').textContent = ad;
+  document.getElementById('cross-product-code').textContent = 'Ana Barkod: ' + barkod;
+  document.getElementById('cross-barkod-input').value = '';
+  renderCrossExisting();
+  document.getElementById('cross-ov').classList.add('open');
+}
+function closeCrossBarcode(){
+  document.getElementById('cross-ov').classList.remove('open');
+  crossTarget = null;
+  renderInventory();
+}
+function renderCrossExisting(){
+  const list = (DB.crossMap||{})[crossTarget]||[];
+  const el = document.getElementById('cross-existing');
+  if(!list.length){ el.innerHTML=''; return; }
+  el.innerHTML = '<label>Mevcut Çapraz Barkodlar</label>' + list.map(c=>`<div style="font-size:13px;padding:6px 0;border-top:1px solid var(--bg);font-family:monospace;">${c}</div>`).join('');
+}
+async function submitCrossBarcode(){
+  const cross = document.getElementById('cross-barkod-input').value.trim();
+  if(!cross){toast('Barkod girin!');return;}
+  if(!crossTarget)return;
+  toast('Ekleniyor...');
+  if(!DB.crossMap) DB.crossMap={};
+  if(!DB.crossMap[crossTarget]) DB.crossMap[crossTarget]=[];
+  if(DB.crossMap[crossTarget].includes(cross)){toast('Bu barkod zaten ekli!');return;}
+  DB.crossMap[crossTarget].push(cross);
+  lsSave();
+  try{
+    const url = GS_URL+'?action=addcross&main='+encodeURIComponent(crossTarget)+'&cross='+encodeURIComponent(cross)+'&ts='+Date.now();
+    const r = await fetch(url);
+    const d = await r.json();
+    toast(d.ok?'✅ Çapraz barkod eklendi!':'⚠️ '+(d.error||'Hata'));
+  }catch(e){toast('✅ Yerel eklendi');}
+  document.getElementById('cross-barkod-input').value='';
+  renderCrossExisting();
+}
+
+async function fetchCrossBarcodes(){
+  try{
+    const r = await fetch(GS_URL+'?action=crossbarcodes&t='+Date.now());
+    const d = await r.json();
+    if(d && d.crossMap){ DB.crossMap = d.crossMap; lsSave(); }
+  }catch(e){}
 }
 
 // ===== EXPORT =====

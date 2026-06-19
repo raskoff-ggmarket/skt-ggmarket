@@ -188,6 +188,22 @@ input:focus{outline:none;border-color:var(--accent);background:#fff;}
       <button class="btn btn-primary" onclick="saveSKT()">✅ Kaydet</button>
     </div>
   </div>
+  <div id="cross-confirm-section" class="hidden">
+    <div class="card" style="border-left:4px solid var(--accent);">
+      <div class="card-title">🔗 Çapraz Barkod Ekle?</div>
+      <div style="font-size:14px;font-weight:700;" id="cross-confirm-product"></div>
+      <div style="font-size:11px;color:var(--muted);font-family:monospace;margin-top:2px;" id="cross-confirm-code"></div>
+      <div style="margin-top:12px;font-size:13px;color:var(--text-muted);">
+        Taranan barkod: <strong style="font-family:monospace;" id="cross-confirm-scanned"></strong><br>
+        bu ürüne çapraz barkod olarak eklensin mi?
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
+        <button class="btn btn-secondary" style="margin:0;" onclick="skipCrossConfirm()">Hayır, Sadece SKT</button>
+        <button class="btn btn-primary" style="margin:0;" onclick="confirmCrossAndContinue()">✅ Evet, Ekle</button>
+      </div>
+    </div>
+  </div>
+
   <div id="notfound-section" class="hidden">
     <div class="notfound-box">
       <p>❌ Ürün listede bulunamadı</p>
@@ -548,6 +564,9 @@ function handleBarcode(code){
     document.getElementById('notfound-code').textContent=code;
     document.getElementById('new-product-name').value='';
     document.getElementById('new-product-skt').value='';
+    document.getElementById('name-search-input').value='';
+    document.getElementById('name-search-results').innerHTML='';
+    document.getElementById('cross-confirm-section').classList.add('hidden');
     document.getElementById('notfound-section').classList.remove('hidden');
   }
 }
@@ -851,11 +870,54 @@ function searchByName(){
 function selectFromNameSearch(barkod){
   const p = findP(barkod);
   if(!p) return;
-  // Clear name search
+  const scannedCode = document.getElementById('notfound-code').textContent;
+
+  // Ask if scanned barcode should be added as cross barcode
   document.getElementById('name-search-input').value='';
   document.getElementById('name-search-results').innerHTML='';
   document.getElementById('notfound-section').classList.add('hidden');
-  // Show found section with this product
+
+  // Show cross barcode confirmation card
+  document.getElementById('cross-confirm-product').textContent = p.a;
+  document.getElementById('cross-confirm-code').textContent = 'Barkod: ' + p.b;
+  document.getElementById('cross-confirm-scanned').textContent = scannedCode;
+  document.getElementById('cross-confirm-section').dataset.mainBarkod = p.b;
+  document.getElementById('cross-confirm-section').dataset.crossBarkod = scannedCode;
+  document.getElementById('cross-confirm-section').dataset.productBarkod = p.b;
+  document.getElementById('cross-confirm-section').classList.remove('hidden');
+}
+
+async function confirmCrossAndContinue(){
+  const el = document.getElementById('cross-confirm-section');
+  const mainBarkod  = el.dataset.mainBarkod;
+  const crossBarkod = el.dataset.crossBarkod;
+
+  // Save cross barcode
+  if(!DB.crossMap) DB.crossMap={};
+  if(!DB.crossMap[mainBarkod]) DB.crossMap[mainBarkod]=[];
+  if(!DB.crossMap[mainBarkod].includes(crossBarkod)){
+    DB.crossMap[mainBarkod].push(crossBarkod);
+    lsSave();
+    try{
+      const url = GS_URL+'?action=addcross&main='+encodeURIComponent(mainBarkod)+'&cross='+encodeURIComponent(crossBarkod)+'&ts='+Date.now();
+      await fetch(url);
+    }catch(e){}
+    toast('✅ Çapraz barkod eklendi!');
+  }
+  el.classList.add('hidden');
+  openFoundSection(mainBarkod);
+}
+
+function skipCrossConfirm(){
+  const el = document.getElementById('cross-confirm-section');
+  const mainBarkod = el.dataset.mainBarkod;
+  el.classList.add('hidden');
+  openFoundSection(mainBarkod);
+}
+
+function openFoundSection(barkod){
+  const p = findP(barkod);
+  if(!p) return;
   curProduct = p;
   document.getElementById('found-name').textContent = p.a;
   document.getElementById('found-code').textContent = 'Barkod: ' + p.b;

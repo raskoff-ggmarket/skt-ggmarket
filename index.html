@@ -181,7 +181,12 @@ input:focus{outline:none;border-color:var(--accent);background:#fff;}
       <div class="found-name" id="found-name"></div>
       <div class="found-code" id="found-code"></div>
     </div>
-    <div class="card">
+    <div id="found-history-card" class="card hidden">
+      <div class="card-title">📋 Mevcut SKT Kayıtları</div>
+      <div id="found-skt-list"></div>
+      <button class="btn btn-secondary" style="margin-top:10px;" onclick="showNewSKTForm()">➕ Yeni SKT Ekle</button>
+    </div>
+    <div class="card" id="new-skt-form-card">
       <div class="card-title">SKT Bilgisi Ekle</div>
       <div class="fg"><label>Son Kullanma Tarihi</label><input type="date" id="skt-date"></div>
       <div class="fg"><label>Not (İsteğe Bağlı)</label><input type="text" id="skt-not" placeholder="..."></div>
@@ -552,13 +557,7 @@ function handleBarcode(code){
     }
   }
   if(p){
-    curProduct=p;
-    document.getElementById('found-name').textContent=p.a;
-    document.getElementById('found-code').textContent='Barkod: '+p.b;
-    const d=new Date();d.setDate(d.getDate()+30);
-    document.getElementById('skt-date').value=d.toISOString().split('T')[0];
-    document.getElementById('skt-not').value='';
-    document.getElementById('found-section').classList.remove('hidden');
+    setupFoundSection(p);
   }else{
     curProduct=null;
     document.getElementById('notfound-code').textContent=code;
@@ -588,6 +587,38 @@ async function saveSKT(){
   document.getElementById('found-section').classList.add('hidden');
   document.getElementById('manual-input').value='';
   curProduct=null;
+}
+
+// ===== FOUND SECTION HELPERS =====
+function setupFoundSection(p){
+  curProduct = p;
+  document.getElementById('found-name').textContent = p.a;
+  document.getElementById('found-code').textContent = 'Barkod: ' + p.b;
+  const existingSkts = getSKTs(p.b);
+  const historyCard = document.getElementById('found-history-card');
+  const formCard = document.getElementById('new-skt-form-card');
+  if(existingSkts.length > 0){
+    document.getElementById('found-skt-list').innerHTML = existingSkts.map(e=>{
+      const d = dl(e.t);
+      return`<div class="skt-row"><div style="flex:1;min-width:0;"><div class="skt-date">${fmtD(e.t)}</div>${e.n?`<div class="skt-note">${e.n}</div>`:''}</div>${sbadge(d)}</div>`;
+    }).join('');
+    historyCard.classList.remove('hidden');
+    formCard.classList.add('hidden');
+  } else {
+    historyCard.classList.add('hidden');
+    formCard.classList.remove('hidden');
+    const d = new Date(); d.setDate(d.getDate()+30);
+    document.getElementById('skt-date').value = d.toISOString().split('T')[0];
+    document.getElementById('skt-not').value = '';
+  }
+  document.getElementById('found-section').classList.remove('hidden');
+}
+
+function showNewSKTForm(){
+  const d = new Date(); d.setDate(d.getDate()+30);
+  document.getElementById('skt-date').value = d.toISOString().split('T')[0];
+  document.getElementById('skt-not').value = '';
+  document.getElementById('new-skt-form-card').classList.remove('hidden');
 }
 
 // ===== HELPERS =====
@@ -723,15 +754,9 @@ function renderInventory(){
 function findP(b){return DB.products.find(x=>x.b===b)||(DB.removed||[]).find(x=>x.b===b);}
 function quickAdd(b){
   const p=findP(b);if(!p)return;
-  curProduct=p;
-  document.getElementById('found-name').textContent=p.a;
-  document.getElementById('found-code').textContent='Barkod: '+p.b;
   document.getElementById('manual-input').value=p.b;
-  const d=new Date();d.setDate(d.getDate()+30);
-  document.getElementById('skt-date').value=d.toISOString().split('T')[0];
-  document.getElementById('skt-not').value='';
-  document.getElementById('found-section').classList.remove('hidden');
   document.getElementById('notfound-section').classList.add('hidden');
+  setupFoundSection(p);
   goTab('scanner');
 }
 function openEdit(b,i){
@@ -825,15 +850,8 @@ async function saveNewProduct(barkod, ad, skt){
 
   // Show found section so user can add SKT if they want
   if(!skt){
-    curProduct = DB.products.find(p=>p.b===barkod);
-    if(curProduct){
-      document.getElementById('found-name').textContent = ad;
-      document.getElementById('found-code').textContent = 'Barkod: '+barkod;
-      const d=new Date(); d.setDate(d.getDate()+30);
-      document.getElementById('skt-date').value = d.toISOString().split('T')[0];
-      document.getElementById('skt-not').value = '';
-      document.getElementById('found-section').classList.remove('hidden');
-    }
+    const newP = DB.products.find(p=>p.b===barkod);
+    if(newP) setupFoundSection(newP);
   }
 }
 
@@ -918,13 +936,7 @@ function skipCrossConfirm(){
 function openFoundSection(barkod){
   const p = findP(barkod);
   if(!p) return;
-  curProduct = p;
-  document.getElementById('found-name').textContent = p.a;
-  document.getElementById('found-code').textContent = 'Barkod: ' + p.b;
-  const d = new Date(); d.setDate(d.getDate()+30);
-  document.getElementById('skt-date').value = d.toISOString().split('T')[0];
-  document.getElementById('skt-not').value = '';
-  document.getElementById('found-section').classList.remove('hidden');
+  setupFoundSection(p);
 }
 
 // ===== CROSS BARCODE =====

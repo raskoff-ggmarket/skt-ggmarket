@@ -131,7 +131,7 @@ input:focus{outline:none;border-color:var(--accent);background:#fff;}
 
 <div class="hdr">
   <div class="hdr-inner">
-    <div><h1>🏪 SKT Takip</h1><div class="hdr-sub" id="hdr-sub">Yükleniyor...</div></div>
+    <div><h1>🏪 SKT Takip <span id="app-ver" style="font-size:10px;font-weight:400;opacity:0.55;vertical-align:middle;"></span></h1><div class="hdr-sub" id="hdr-sub">Yükleniyor...</div></div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="user-badge" style="background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;"></div>
   
@@ -347,6 +347,7 @@ input:focus{outline:none;border-color:var(--accent);background:#fff;}
 <div class="toast" id="toast"></div>
 
 <script>
+const APP_VERSION = 'v1.0.1';
 const GS_URL = 'https://script.google.com/macros/s/AKfycbwEEGizyIDFTEq01wD2Ogb6FJDq0oMC-sIm5KtTekiUHoHeaNDNoqS4sSCw0q43sTO9/exec';
 
 // ===== SOUNDS =====
@@ -441,6 +442,7 @@ async function gsDelSKT(barkod, id){
 
 // ===== INIT =====
 async function init(){
+  document.getElementById('app-ver').textContent = APP_VERSION;
   lsLoad();
   document.getElementById('load-txt').textContent = 'Google Sheets\'ten yükleniyor...';
   await gsLoad();

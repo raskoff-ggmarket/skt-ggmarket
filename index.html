@@ -409,21 +409,24 @@ let scannerOn = false;
 function lsSave(){try{localStorage.setItem(SKEY,JSON.stringify(DB));}catch(e){}}
 function lsLoad(){try{const r=localStorage.getItem(SKEY);if(r){const d=JSON.parse(r);if(d)DB=d;}}catch(e){}}
 
+function fetchWithTimeout(url, ms=8000){
+  const ctrl = new AbortController();
+  const id = setTimeout(()=>ctrl.abort(), ms);
+  return fetch(url, {signal:ctrl.signal}).finally(()=>clearTimeout(id));
+}
+
 async function gsLoad(){
   try{
-    // Load SKTs from Sheets
-    const r = await fetch(GS_URL+'?action=load&t='+Date.now());
+    const r = await fetchWithTimeout(GS_URL+'?action=load&t='+Date.now());
     const d = await r.json();
     if(d && d.skts !== undefined){
       DB.skts = d.skts || {};
       if(d.notifLog) DB.notifLog = d.notifLog;
       lsSave();
     }
-    // Load products from Sheets (always fresh)
-    const r2 = await fetch(GS_URL+'?action=products&t='+Date.now());
+    const r2 = await fetchWithTimeout(GS_URL+'?action=products&t='+Date.now());
     const d2 = await r2.json();
     if(d2 && d2.products && d2.products.length){
-      // Keep SKT data when merging products
       const nb = new Set(d2.products.map(p=>p.b));
       DB.removed = (DB.removed||[]).filter(p=>!nb.has(p.b));
       DB.products.filter(p=>!nb.has(p.b)).forEach(p=>{ if(!DB.removed.find(r=>r.b===p.b)) DB.removed.push(p); });
@@ -464,7 +467,8 @@ async function gsDelSKT(barkod, id){
 
 // ===== INIT =====
 async function init(){
-  document.getElementById('app-ver').textContent = APP_VERSION;
+  const verEl = document.getElementById('app-ver');
+  if(verEl) verEl.textContent = APP_VERSION;
   lsLoad();
   document.getElementById('load-txt').textContent = 'Google Sheets\'ten yükleniyor...';
   await gsLoad();
@@ -1009,7 +1013,7 @@ async function submitCrossBarcode(){
 
 async function fetchCrossBarcodes(){
   try{
-    const r = await fetch(GS_URL+'?action=crossbarcodes&t='+Date.now());
+    const r = await fetchWithTimeout(GS_URL+'?action=crossbarcodes&t='+Date.now());
     const d = await r.json();
     if(d && d.crossMap){ DB.crossMap = d.crossMap; lsSave(); }
   }catch(e){}
